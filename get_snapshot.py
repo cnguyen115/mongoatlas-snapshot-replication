@@ -1,4 +1,3 @@
-
 import os
 import requests
 from requests.auth import HTTPDigestAuth
