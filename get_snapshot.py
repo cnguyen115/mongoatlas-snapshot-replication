@@ -105,7 +105,7 @@ def main():
     print("Restoring mongod file system...")
     restore_mongo_file_system(directory, path_to_mongodb)
     print("Fixing permissions...")
-    change_permissions('mongodb', 'nogroup', path_to_mongodb)
+    change_permissions('mongodb', 'mongodb', path_to_mongodb)
     print("Starting mongod service...")
     start_mongod_service()
     print("Script completed.")
