@@ -1,6 +1,5 @@
-import grp
+
 import os
-import pwd
 import requests
 from requests.auth import HTTPDigestAuth
 import shutil
@@ -53,48 +52,63 @@ def tar_extract(filename, filepath):
     with tarfile.open(filename) as t:
         t.extractall(path=filepath)
 
-    return filepath
+    dir_path = '{filepath}/{dir}'.format(filepath=filepath,
+                                         dir=os.listdir(path=filepath)[0])
+
+    # Delete tar file to save space
+    os.remove(filename)
+
+    return dir_path
 
 def stop_mongod_service():
     """Stop mongod service"""
-    subprocess.run(["systemctl"], ["stop"], ["mongod"])
+    return subprocess.run(['systemctl', 'stop', 'mongod'])
 
 def restore_mongo_file_system(snapshot_path, path_to_mongodb):
-    """Make a backup of current mongodb file/database and restore snapshot"""
+    """Copy mongo snapshot into mongodb"""
     if os.path.exists(path_to_mongodb):
-        if os.path.exists('{path}_backup'.format(path=path_to_mongodb)):
-            shutil.rmtree('{path}_backup'.format(path=path_to_mongodb))
-        shutil.move(path_to_mongodb,
-                    '{path}_backup'.format(path=path_to_mongodb))
+        shutil.rmtree(path_to_mongodb)
 
-    shutil.move(snapshot_path, path_to_mongodb)
+    shutil.copytree(snapshot_path, path_to_mongodb)
 
 def change_permissions(user, group, path):
     """Change mongodb file/database owner to mongodb"""
-    uid = pwd.getpwnam(user).pw_uid
-    gid = grp.getgrnam(group).gr_gid
-
-    os.chown(path, uid, gid)
+    for root, dirs, files in os.walk(path):
+        for dir in dirs:
+            shutil.chown(os.path.join(root, dir), user=user, group=group)
+        for file in files:
+            shutil.chown(os.path.join(root, file), user=user, group=group)
 
 def start_mongod_service():
     """Start mongod service"""
-    subprocess.run(["systemctl"], ["start"], ["mongod"])
+    return subprocess.run(['systemctl', 'start', 'mongod'])
 
 def main():
     """Summon the :party-wizard:"""
     config = yaml.safe_load(open('config.yml'))
+    path_to_mongodb = '/var/lib/mongodb'
 
+    print("Getting snapshot id...")
     snapshot_id = get_snapshot_id(config['username'], config['password'],
                                   config['group_id'], config['cluster_name'])
+    print("Snapshot ID: {}".format(snapshot_id))
     download_url = restore_jobs(config['username'], config['password'],
                                 config['group_id'], config['cluster_name'],
                                 snapshot_id)
+    print("Starting Download...\nDownload URL: {}".format(download_url))
     filename = download_file(download_url)
+    print("Download Completed. Extracting {}...".format(filename))
     directory = tar_extract(filename, 'mongodb')
+    print("Extraction completed.")
+    print("Stopping mongod service...")
     stop_mongod_service()
-    path_to_mongodb = restore_mongo_file_system(directory, 'var/lib/mongodb')
-    change_permission('mongodb', 'mongodb', path_to_mongodb)
+    print("Restoring mongod file system...")
+    restore_mongo_file_system(directory, path_to_mongodb)
+    print("Fixing permissions...")
+    change_permissions('mongodb', 'nogroup', path_to_mongodb)
+    print("Starting mongod service...")
     start_mongod_service()
+    print("Script completed.")
 
 if __name__ == '__main__':
     main()
