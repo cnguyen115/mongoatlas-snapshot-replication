@@ -1,3 +1,4 @@
+import datetime
 import os
 import requests
 from requests.auth import HTTPDigestAuth
@@ -102,6 +103,8 @@ def main():
     config = yaml.safe_load(open('config.yml'))
     path_to_mongodb = '/var/lib/mongodb'
 
+    print("{datetime}: Starting script...".format(
+        datetime=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
     mongo_api = MongoAPI(config['username'], config['password'],
                          config['group_id'], config['cluster_name'])
     snapshot_id = mongo_api.get_snapshot_id()
@@ -112,7 +115,8 @@ def main():
     restore_mongo_file_system(directory, path_to_mongodb)
     change_permissions('mongodb', 'mongodb', path_to_mongodb)
     start_mongod_service()
-    print("Script completed.")
+    print("{datetime}: Script Completed".format(
+        datetime=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
 
 if __name__ == '__main__':
     main()
